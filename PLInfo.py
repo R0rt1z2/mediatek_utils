@@ -6,6 +6,7 @@ import sys
 import traceback
 
 MTK_BLOADER_INFO = b'MTK_BLOADER_INFO'
+ROM_INFO = b'ROMINFO_v'
 DATE_BYTES = b'Build'
 HEADER_BYTES = b'EMMC_BOOT'
 EMMC_FLASH_IMAGE = 0x0
@@ -36,8 +37,15 @@ def read_bloader_info(f, data):
     bloader_info = f.read(3)
     print("BLOADER_INFO Version: {}".format(bloader_info.decode("utf-8")))
     f.read(7) # bloader_info to pl name
-    pl_name = f.read(40) # preloader names. Accepts up to 40 bytes.
+    pl_name = f.read(40)
     print("Preloader Name: {}".format(pl_name.decode("utf-8")))
+
+def read_platform(f, data):
+    offset = data.find(ROM_INFO)
+    f.seek(offset + 9)
+    f.read(7)
+    platform = f.read(6)
+    print("Platform: {}".format(platform.decode("utf-8")))
     
 def read_load_addr(f, header=False):
     f.seek(0)
@@ -55,6 +63,7 @@ def main():
     read_load_addr(f, header)
     read_date(f, data)
     read_bloader_info(f, data)
+    read_platform(f, data)
     
 if __name__ == '__main__':
     try:
