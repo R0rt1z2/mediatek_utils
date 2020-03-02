@@ -36,7 +36,7 @@ def read_bloader_info(f, data):
     bloader_info = f.read(3)
     print("BLOADER_INFO Version: {}".format(bloader_info.decode("utf-8")))
     f.read(7) # bloader_info to pl name
-    pl_name = f.read(30)
+    pl_name = f.read(40) # preloader names. Accepts up to 40 bytes.
     print("Preloader Name: {}".format(pl_name.decode("utf-8")))
     
 def read_load_addr(f, header=False):
