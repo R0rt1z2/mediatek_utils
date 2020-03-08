@@ -3,7 +3,6 @@ from serial import *
 import sys
 import struct
 import time
-import glob
 import os.path
 import serial.tools.list_ports
 
@@ -17,11 +16,26 @@ HWID_LIST = {
    "MT6627" : "0003"
 }
 
-def write(s, command):
-        s.flushInput()
-        s.write(command)
-        s.flush()
-        return s.read(len(command))
+class Device(serial.Serial):
+
+    def write8(self, command):
+        self.flushInput()
+        self.write(command)
+        self.flush()
+        return self.read(len(command))
+
+    def check8(self, bytes, len):
+        if bytes and len > 1:
+            raise Exception("Only can check 1 byte of data")
+        b_check = self.read(1)
+        if b_check != bytes:
+            raise Exception("Bytes doesn't match.")
+
+def parse_platform(platform):
+     platform = hex(platform)
+     platform = "".join(reversed([platform[i:i+2] for i in range(0, len(platform), 2)]))
+     platform = "MT{}".format(platform[:-2])
+     return platform
 
 def manage_ports(s, action):
      # Closes and opens specified port. s = port, action = close/open #
@@ -31,7 +45,7 @@ def manage_ports(s, action):
          sys.exit(0)
      elif action is "open":
          print("[?] Opening {}...".format(s))
-         s = serial.Serial(s)
+         s = Device(s)
          print("[+] Port Opened correctly!")
          return s
      else:
@@ -68,27 +82,21 @@ def handshake(s, device):
      if device == "Unknown":
            print("[!] Attempt to write to an unknown device...")
 
-     try:
-       while True:
-          b = write(s, b'\xa0')
-          if b == b'\x5f':
-             break
+     s.write8(b"\xA0")
+     s.write8(b"\xA0")
 
-       print("[?] Complete the sequence...")
-       write(s, b'\x0a')
-       write(s, b'\x50')
-       write(s, b'\x05')
+     print("[?] Complete the sequence...")
+     s.write8(b"\x0A")
+     s.write8(b"\x50")
+     s.write8(b"\x05")
 
-       print("[+] Handshake Complete!")
-
-     except (OSError, serial.SerialException):
-          print("[-] FATAL: Error during the handshake of the device...")
+     print("[+] Handshake Complete!")
          
 def main():
 
      if sys.argv[1] == "-h":
-          print("\n                              MediaTek Handshake Tool\n")
-          print("         preloader_tool.py -d /dev/ttyACM0 --> Handshake the specified port\n")
+          print("\n                          MediaTek Handshake Tool\n")
+          print("     preloader_tool.py -d /dev/ttyACM0 ==> Handshake the specified port\n")
 
      elif sys.argv[1] == "-d":
           sys.stdout.write("\n[?] Waiting for the device...")
@@ -111,8 +119,11 @@ def main():
 
           else:
               #serial_check(s, b'READY', 5)
-              if sys.argv[1] == "-d":
-                 manage_ports(s, "close")
+              s.write8(GET_HW_CODE)
+              platform, response = struct.unpack('hh', s.read(4))
+              print("[?] Preloader reported platform: {}".format(parse_platform(platform)))
+              manage_ports(s, "close")
+
      else:
           print("\n[-] Invalid option: {}\n".format(sys.argv[1]))
 
