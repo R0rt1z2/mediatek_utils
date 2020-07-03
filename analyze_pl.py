@@ -1,78 +1,129 @@
-#!/usr/bin/env python3
-
-import os
-import struct
 import sys
-import traceback
+import struct
+import re
 
-MTK_BLOADER_INFO = "4d544b5f424c4f414445525f494e464f"
-ROM_INFO = "524f4d494e464f5f76"
-DATE_BYTES = "4275696c64"
-HEADER_BYTES = "454d4d435f424f4f54"
+# Program Version.
+_VERSION_ = 1.1
 
-EMMC_FLASH_IMAGE = 0x0
-MEDIATEK_BOOT_HEADER = 0x800
-BOOT_SECTION_START = 0x214
-MEDIATEK_FILE_INFO = 0x808
+# Start Offset of all the different headers.
+EMMC_HDR_START = 0x0
+BRLYT_HDR_START = 0x200
+BROM_HDR_START = 0x800
 
-def check_emmc_boot(f):
-    f.seek(0) # first byte
-    header = f.read(0x9)
-    if header != parse_hex(HEADER_BYTES):
-        header = False
-        return header
-    else:
-        print("Preloader Header: {}".format(header.decode("utf-8")))
-        header = True
-        return header
+def logi(s):
+    """ Prints log info.
+        :returns: nothing."""
+    print("[?] {}".format(s))
 
-def parse_hex(hex):
-    return bytes.fromhex(hex)
+def logw(s):
+    """ Prints log warnings.
+        :returns: nothing."""
+    print("[!] {}".format(s))
 
-def read_date(f, data):
-    offset = data.find(parse_hex(DATE_BYTES))
-    f.seek(offset + 16)
-    date = f.read(15)
-    print("Preloader Date: {}".format(date.decode("utf-8")))
+def loge(s):
+    """ Prints log error.
+        :returns: nothing."""
+    print("[-] {}".format(s))
 
-def read_bloader_info(f, data):
-    offset = data.find(parse_hex(MTK_BLOADER_INFO))
-    f.seek(offset + 17) # len(MTK_BLOADER_INFO) + '_'
-    bloader_info = f.read(3)
-    print("BLOADER_INFO Version: {}".format(bloader_info.decode("utf-8")))
-    f.read(7) # bloader_info to pl name
-    pl_name = f.read(40)
-    print("Preloader Name: {}".format(pl_name.decode("utf-8")))
+def logs(s):
+    """ Prints log succeed.
+        :returns: nothing."""
+    print("[+] {}".format(s))
 
-def read_platform(f, data):
-    offset = data.find(parse_hex(ROM_INFO))
-    f.seek(offset + 9)
-    f.read(7)
-    platform = f.read(6)
-    print("Platform: {}".format(platform.decode("utf-8")))
-    
-def read_load_addr(f, header=False):
-    f.seek(0)
-    if header:
-        f.read(MEDIATEK_BOOT_HEADER) #2048
-    f.read(20) # "FILE_INFO"
-    f.read(8) # file_ver, file_type, flash_dev, sig_type
-    load_addr, = struct.unpack('<I', f.read(4))
-    load_addr = "0x%X" % load_addr
-    print("Preloader Load Address: {}".format(load_addr))
-    
+def u32_le(x):
+    """ Unpacks a Little Endian 32 bit value.
+        :returns: the unpacked value."""
+    return struct.unpack("<I", x)[0]
+
+def u16_le(x):
+    """ Unpacks a Little Endian 16 bit value.
+        :returns: the unpacked value."""
+    return struct.unpack("<H", x)[0]
+
+def u8_le(x):
+    """ Unpacks a Little Endian 8 bit value.
+        :returns: the unpacked value."""
+    return struct.unpack("<H", b'\x00' + x)[0]
+
+def pchar(x):
+    """ Parses and decodes a string inside given bytes.
+        :returns: the parsed string."""
+    return str(x.decode('ascii'))
+
+def bfhx(x):
+    """ Parses the bytes from a given hex value using
+        the built-in "bytes.fromhex()" method.
+        :returns: the converted bytes."""
+    return bytes.fromhex(x)
+
+def parse_gen_header(preloader):
+    """ Parses and prints the header for NOR/SD/eMMC.
+        :returns: nothing."""
+    preloader.seek(EMMC_HDR_START)
+    print("Name = {}".format(pchar(preloader.read(12))))
+    print("Version = {}".format(u32_le(preloader.read(4))))
+    print("Size = {}".format(u32_le(preloader.read(4))))
+
+def parse_brlyt(preloader):
+    """ Parses and prints the BootROM layout header.
+        :returns: nothing."""
+    preloader.seek(BRLYT_HDR_START)
+    print("Name = {}".format(pchar(preloader.read(8))))
+    print("Version = {}".format(u32_le(preloader.read(4))))
+    print("Size = {}".format(u32_le(preloader.read(4))))
+    print("Total Size = {}".format(u32_le(preloader.read(4))))
+    print("Magic = {}".format(u32_le(preloader.read(4))))
+    print("Type = {}".format(u32_le(preloader.read(4))))
+    print("Second Size = {}".format(u32_le(preloader.read(4))))
+    print("Second Total Size = {}".format(u32_le(preloader.read(4))))
+
+def parse_gfh_common_header(preloader):
+    """ Parses and prints the BootROM header definitions.
+        :returns: nothing."""
+    preloader.seek(BROM_HDR_START)
+    print("Magic = {}".format(pchar(preloader.read(3))))
+    print("Version = {}".format(u8_le(preloader.read(1))))
+    print("Size = {}".format(u16_le(preloader.read(2))))
+    print("Type = {}".format(u16_le(preloader.read(2))))
+
+def parse_file_info(preloader):
+    """ Parses and prints the File Info header.
+        :returns: nothing."""
+    preloader.seek(BROM_HDR_START + 8) # Skip the gfh common header
+    print("Name = {}".format(pchar(preloader.read(12)))) # FILE_INFO
+    preloader.read(4) # Skip unused bytes
+    print("File Type = {}".format(u16_le(preloader.read(2))))
+    print("Flash Type = {}".format(u8_le(preloader.read(1))))
+    print("Sig Type = {}".format(u8_le(preloader.read(1))))
+    print("Load Address = 0x%X" % u32_le(preloader.read(4)))
+    print("Total Size = {}".format(u32_le(preloader.read(4))))
+    print("Max Size = {}".format(u32_le(preloader.read(4))))
+    print("Header Size = {}".format(u32_le(preloader.read(4))))
+    print("Signature Type = {}".format(u32_le(preloader.read(4))))
+    print("Jump Offset = {}".format(u32_le(preloader.read(4))))
+    print("Proccessed = {}".format(u32_le(preloader.read(4))))
+
 def main():
-    data = f.read()
-    header = check_emmc_boot(f)
-    read_load_addr(f, header)
-    read_date(f, data)
-    read_bloader_info(f, data)
-    read_platform(f, data)
-    
-if __name__ == '__main__':
+    print("")
+    logi("MediaTek Preloader Parser - R0rt1z2 - v{}\n".format(_VERSION_))
+    logi("Selected file: {}\n".format(sys.argv[1]))
+    logi("Opening {}...\n".format(sys.argv[1]))
     try:
-        preloader = sys.argv[1]
-        f = open(preloader, 'rb')
-        main()
-    except Exception:
-        traceback.print_exc()
+        preloader = open(sys.argv[1], "rb")
+    except FileNotFoundError:
+        loge("Cannot open {}!\n".format(sys.argv[1]))
+        return -1
+    logi("Parsing the header for NOR/SD/eMMC...") 
+    parse_gen_header(preloader)
+    print("")
+    logi("Parsing the BootROM layout header...")
+    parse_brlyt(preloader)
+    print("")
+    logi("Parsing the BootROM header definitions...")
+    parse_gfh_common_header(preloader)
+    print("")
+    logi("Parsing the File Info header...")
+    parse_file_info(preloader)
+    print("")
+
+main()
