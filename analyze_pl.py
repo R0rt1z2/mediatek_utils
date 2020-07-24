@@ -9,6 +9,7 @@ _VERSION_ = 1.1
 EMMC_HDR_START = 0x0
 BRLYT_HDR_START = 0x200
 BROM_HDR_START = 0x800
+ROM_INFO_HDR_START = 0x00000CF0
 
 def logi(s):
     """ Prints log info.
@@ -103,6 +104,13 @@ def parse_file_info(preloader):
     print("Jump Offset = {}".format(u32_le(preloader.read(4))))
     print("Proccessed = {}".format(u32_le(preloader.read(4))))
 
+def parse_rom_info(preloader):
+    preloader.seek(ROM_INFO_HDR_START + 12) # Skip FF padding
+    preloader.read(13) # Skip ROM_INFO string
+    print("Version = {}".format(u32_le(preloader.read(4))))
+    preloader.read(3)
+    print("Platform = {}".format(pchar(preloader.read(6))))
+    
 def main():
     print("")
     logi("MediaTek Preloader Parser - R0rt1z2 - v{}\n".format(_VERSION_))
@@ -124,6 +132,9 @@ def main():
     print("")
     logi("Parsing the File Info header...")
     parse_file_info(preloader)
+    print("")
+    logi("Parsing the Rom Info header...")
+    parse_rom_info(preloader)
     print("")
 
 main()
