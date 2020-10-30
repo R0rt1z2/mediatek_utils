@@ -96,7 +96,7 @@ def main():
 
      if sys.argv[1] == "-h":
           print("\n                          MediaTek Handshake Tool\n")
-          print("     preloader_tool.py -d /dev/ttyACM0 ==> Handshake the specified port\n")
+          print("     pl_handshake.py -d /dev/ttyACM0 ==> Handshake the specified port\n")
 
      elif sys.argv[1] == "-d":
           sys.stdout.write("\n[?] Waiting for the device...")

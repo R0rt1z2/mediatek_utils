@@ -12,7 +12,7 @@ PL_HEADER = 0x800
 def get_offset(data):
     offset = data.find(LK_HEADER)
     if offset == -1:
-        print("[-] Cannot find the end of the header! Is this an LK?")
+        print("[-] Couldn't find the end of the header! Is this an LK?")
         exit(1)
     print("[?] Header size is {} bytes.".format(offset))
     return offset
