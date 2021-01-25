@@ -134,8 +134,6 @@ def main():
         loge("Couldn't open {}!\n".format(image))
         return -1
 
-    print("- File Offset = %d" % struct.unpack("<I", preloader.read()[40:44])[0])
-
     if sys.argv[1] == '--header':
         logi("Parsing the header for NOR/SD/eMMC...") 
         parse_gen_header(preloader)
