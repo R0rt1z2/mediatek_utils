@@ -1,44 +1,37 @@
 #!/usr/bin/env python3
-##############################################
-# Searches and cuts off the header of the LK #
-##############################################
+######################################################
+# Searches and cuts off the header of MediaTek LK/PL #
+######################################################
 
 import sys
-import os.path
 
 LK_HEADER = b'\x07\x00\x00\xea'
-PL_HEADER = 0x800
-
-def get_offset(data):
-    offset = data.find(LK_HEADER)
-    if offset == -1:
-        print("[-] Couldn't find the end of the header! Is this an LK?")
-        exit(1)
-    print("[?] Header size is {} bytes.".format(offset))
-    return offset
-
-def cut_header(image, out, offset):
-    with open(image, 'rb') as in_file:
-        with open(out, 'wb') as out_file:
-           out_file.write(in_file.read()[offset:])
-    print("[+] Header Remove Complete. Output: {}!".format(out))
 
 def main():
-    if os.path.isfile(file):
-        with open(file, "rb") as lk:
-            data = lk.read()
-        if "lk" in sys.argv[1]:
-            offset = get_offset(data)
-            cut_header(file, "cutted_lk.img", offset)
-        elif "pl" in sys.argv[1]:
-            cut_header(file, "cutted_pl.img", PL_HEADER)
+    if sys.argv[1] == "lk":
+        offset = fp.read().find(LK_HEADER)
+        if offset != -1:
+            with open(sys.argv[2], "rb") as in_file:
+                with open("cutted_lk.img", 'wb') as out_file:
+                    out_file.write(in_file.read()[offset:])
+            print("[+] All done, output image is cutted_lk.img")
         else:
-            print("[?] USAGE: python3 cutter.py lk/pl image.img")
-            exit(1)
+            print("[-] Invalid LK offset ({})".format(offset))
+    elif sys.argv[1] == "pl":
+            with open(sys.argv[2], "rb") as in_file:
+                with open("cutted_pl.img", 'wb') as out_file:
+                    out_file.write(in_file.read()[0x800:])
+            print("[+] All done, output image is cutted_pl.img")
     else:
-        print("[-] Cannot open {}!".format(file))
-        exit(1)
+        print("[!] Invalid option: {}".format(sys.argv[1]))
 
 if __name__ == '__main__':
-    file = sys.argv[2]
+    try:
+        fp = open(sys.argv[2], "rb")
+    except IndexError as e:
+        print("[-] Missing arguments: [pl/lk].")
+        exit(1)
+    except FileNotFoundError as e:
+        print("[-] Invalid input file: {}".format(sys.argv[2]))
+        exit(1)
     main()
